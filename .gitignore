@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# NOD assignment material - keep private
+*.pdf
+
+# Environment variables - never commit API keys
+.env
