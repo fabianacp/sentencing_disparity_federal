@@ -10,8 +10,10 @@ import plotly.graph_objects as go
 from dash import Dash, dcc, html
 
 # ── Load data ─────────────────────────────────────────────────────────────────
-drug_df  = pd.read_csv("data/processed/drug_sentences_fy20_fy25.csv")
-resid_df = pd.read_csv("data/processed/residuals.csv")
+drug_df    = pd.read_csv("data/processed/drug_sentences_fy20_fy25.csv")
+resid_df   = pd.read_csv("data/processed/residuals.csv")
+shap_df    = pd.read_csv("data/processed/shap_values.csv")
+fl_df      = pd.read_csv("data/processed/fairlearn_metrics.csv")
 
 RACE_MAP = {1: "White", 2: "Black", 3: "Hispanic", 6: "Other"}
 drug_df["Race"]  = drug_df["NEWRACE"].map(RACE_MAP)
@@ -208,7 +210,7 @@ severity_by_race = (
 )
 fig_severity_all = make_bar(
     severity_by_race, "Race", "Mean guideline minimum (months)", "{:.0f} mo",
-    y_title="Mean guideline minimum sentence (months)",
+    y_title="Mean guideline minimum<br>sentence (months)",
     order=["White", "Black", "Hispanic"],
 )
 
@@ -247,6 +249,98 @@ fig_poss_resid = make_bar(
     y_title="Extra months vs White defendants",
     hline=True, order=["White", "Black"],
 )
+
+
+# ═══════════════════════════════════════════════════════════
+# TAB 5 — SHAP feature importance
+# ═══════════════════════════════════════════════════════════
+FEAT_LABELS = {
+    "GLMIN":       "Guideline minimum (months)",
+    "DISTRICT":    "Federal district",
+    "GLMAX":       "Guideline maximum (months)",
+    "SMIN1":       "Statutory minimum",
+    "NOCOUNTS":    "Number of counts",
+    "AGE":         "Defendant age",
+    "FISCAL_YEAR": "Fiscal year",
+    "CRIMPTS":     "Criminal history points",
+    "NUMDEPEN":    "Number of dependents",
+    "TOTCHPTS":    "Total chapter points",
+    "XCRHISSR":    "Criminal history category",
+    "NEWEDUC":     "Education level",
+    "DISPOSIT":    "Case disposition",
+    "SMAX1":       "Statutory maximum",
+    "MONSEX":      "Sex",
+    "CITIZEN":     "Citizenship",
+    "ZONE":        "Guideline zone",
+    "OFFGUIDE":    "Offense guideline",
+    "DRUGMIN":     "Drug mandatory minimum",
+    "WEAPON":      "Weapon enhancement",
+}
+
+# Top-10 features only, sorted ascending for horizontal bar
+shap_top = shap_df.head(10).copy()
+shap_top["label"] = shap_top["feature"].map(FEAT_LABELS).fillna(shap_top["feature"])
+shap_top = shap_top.sort_values("mean_abs_shap")
+
+fig_shap = go.Figure(go.Bar(
+    x=shap_top["mean_abs_shap"],
+    y=shap_top["label"],
+    orientation="h",
+    marker_color=COLORS["salmon"],
+    marker_line=BAR_LINE,
+    text=[f"{v:.1f}" for v in shap_top["mean_abs_shap"]],
+    textposition="outside",
+    textfont=dict(size=16),
+))
+fig_shap.update_layout(
+    showlegend=False,
+    plot_bgcolor="#F8F8F8",
+    font=dict(size=17),
+    margin=dict(t=10, b=10, l=260, r=60),
+    xaxis=dict(title="Mean |SHAP| value (months of sentence)", gridcolor="#E0E0E0"),
+    yaxis=dict(automargin=True),
+)
+
+
+# ═══════════════════════════════════════════════════════════
+# TAB 6 — Fairlearn group metrics
+# ═══════════════════════════════════════════════════════════
+RACE_COLORS_FL = {
+    "Black":    "#A8A8A8",
+    "Hispanic": "#D4AA70",
+    "White":    "#EDE0C4",
+    "Other":    "#C8C8C8",
+}
+
+fl_colors = [RACE_COLORS_FL.get(r, "#CCC") for r in fl_df["Race"]]
+
+fig_fl_mae = go.Figure(go.Bar(
+    x=fl_df["Race"], y=fl_df["MAE"],
+    marker_color=fl_colors, marker_line=BAR_LINE,
+    text=[f"{v:.1f} mo" for v in fl_df["MAE"]],
+    textposition="outside", textfont=dict(size=17),
+))
+fig_fl_mae.update_layout(
+    showlegend=False, plot_bgcolor="#F8F8F8", font=dict(size=17),
+    margin=dict(t=10, b=10),
+    yaxis=dict(title="Mean Absolute Error (months)", gridcolor="#E0E0E0"),
+)
+
+fig_fl_r2 = go.Figure(go.Bar(
+    x=fl_df["Race"], y=fl_df["R2"],
+    marker_color=fl_colors, marker_line=BAR_LINE,
+    text=[f"{v:.3f}" for v in fl_df["R2"]],
+    textposition="outside", textfont=dict(size=17),
+))
+fig_fl_r2.update_layout(
+    showlegend=False, plot_bgcolor="#F8F8F8", font=dict(size=17),
+    margin=dict(t=10, b=10),
+    yaxis=dict(title="R² (model explanatory power)", gridcolor="#E0E0E0",
+               range=[0, 1]),
+)
+
+mae_gap = float(fl_df["MAE"].max() - fl_df["MAE"].min())
+r2_gap  = float(fl_df["R2"].max()  - fl_df["R2"].min())
 
 
 # ═══════════════════════════════════════════════════════════
@@ -668,6 +762,118 @@ app.layout = html.Div(
                         ]),
                     ]),
                 ]),
+            ])]),
+
+            # ── TAB 5: SHAP feature importance ────────────────────────────
+            dcc.Tab(label="🌲  SHAP: What Drives Sentences?",
+                    style=TAB_STYLE, selected_style=TAB_SEL,
+                    children=[html.Div(
+                        style={"paddingTop": "24px",
+                               "maxHeight": "80vh", "overflowY": "auto"},
+                        children=[
+
+                html.Div(style=CARD, children=[
+                    html.H2("What Actually Drives Sentence Length?", style=SEC_TITLE),
+                    html.P(
+                        "SHAP (SHapley Additive exPlanations) measures how much each "
+                        "legal factor moves the model's prediction — in months. Longer "
+                        "bars mean that feature has a bigger impact on the sentence. "
+                        "Race is not in this list because it was never given to the model.",
+                        style=SEC_SUB,
+                    ),
+                    dcc.Graph(figure=fig_shap, config=GRAPH_CFG,
+                              style={"height": "460px"}),
+                    html.P(
+                        "The guideline range (GLMIN / GLMAX) dominates — the model "
+                        "largely learns to predict within the range the judge already set. "
+                        "Federal district is the second biggest driver, meaning where "
+                        "you are sentenced matters almost as much as the crime itself.",
+                        style=CAPTION,
+                    ),
+                ]),
+
+                html.Div(style=METHOD_BOX, children=[
+                    html.H3("How to read this chart",
+                            style={"fontSize": "21px", "marginBottom": "8px",
+                                   "color": "#1a1a2e"}),
+                    html.P(
+                        "Each bar is the average absolute SHAP value across all 1,633 "
+                        "test-set cases — measured in months. A value of 29.6 for "
+                        "Guideline minimum means that feature shifts the prediction "
+                        "by about 29.6 months on average. SHAP values are additive: "
+                        "the sum of all features equals the model's prediction minus "
+                        "the baseline (average sentence).",
+                        style={"fontSize": "19px", "margin": 0, "lineHeight": "1.6"},
+                    ),
+                ]),
+
+            ])]),
+
+            # ── TAB 6: Fairlearn group metrics ────────────────────────────
+            dcc.Tab(label="⚖️  Fairlearn: Model Fairness",
+                    style=TAB_STYLE, selected_style=TAB_SEL,
+                    children=[html.Div(
+                        style={"paddingTop": "24px",
+                               "maxHeight": "80vh", "overflowY": "auto"},
+                        children=[
+
+                html.Div(style=CARD, children=[
+                    html.H2("Is the Model Equally Accurate Across Races?",
+                            style=SEC_TITLE),
+                    html.P(
+                        "Fairlearn's MetricFrame computes MAE and R² separately for each "
+                        "racial group. If the model is much less accurate for one group, "
+                        "its legal baseline for that group is less trustworthy — and any "
+                        "residual disparity finding is harder to interpret.",
+                        style=SEC_SUB,
+                    ),
+                    html.Div(style={"display": "flex", "gap": "28px"}, children=[
+                        html.Div(style={"flex": "1"}, children=[
+                            html.P("Mean Absolute Error by race",
+                                   style={"fontWeight": "600", "fontSize": "19px",
+                                          "marginBottom": "4px"}),
+                            dcc.Graph(figure=fig_fl_mae, config=GRAPH_CFG),
+                            html.P(
+                                f"MAE gap across groups: {mae_gap:.1f} months. "
+                                "White defendants have the highest MAE — the model is "
+                                "least precise for that group, partly because White "
+                                "defendants span a wider range of offense severities.",
+                                style=CAPTION,
+                            ),
+                        ]),
+                        html.Div(style={"flex": "1"}, children=[
+                            html.P("R² (explanatory power) by race",
+                                   style={"fontWeight": "600", "fontSize": "19px",
+                                          "marginBottom": "4px"}),
+                            dcc.Graph(figure=fig_fl_r2, config=GRAPH_CFG),
+                            html.P(
+                                f"R² gap across groups: {r2_gap:.3f}. "
+                                "The model explains sentence variation much better for "
+                                "Hispanic defendants (R² = 0.815) than for White defendants "
+                                "(R² = 0.525). This suggests judges deviate more from "
+                                "guidelines for White defendants — or that the model's "
+                                "features capture Hispanic cases more completely.",
+                                style=CAPTION,
+                            ),
+                        ]),
+                    ]),
+                ]),
+
+                html.Div(style={**METHOD_BOX, "borderLeft": "4px solid #C06030"},
+                         children=[
+                    html.H3("What this means for our disparity findings",
+                            style={"fontSize": "21px", "marginBottom": "8px",
+                                   "color": "#1a1a2e"}),
+                    html.P(
+                        "The model performs comparably for Black and White defendants "
+                        f"(MAE gap of only {mae_gap:.1f} months). This means the residuals "
+                        "we report in Finding 2 are not an artifact of the model being "
+                        "worse at predicting one group — the baseline is equally reliable "
+                        "for both. The disparity finding stands.",
+                        style={"fontSize": "19px", "margin": 0, "lineHeight": "1.6"},
+                    ),
+                ]),
+
             ])]),
 
         ]),

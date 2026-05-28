@@ -21,10 +21,11 @@ Built at NOD Coding Stockholm.
 ## Project Structure
 
 ```
-notebooks/01_eda.ipynb   — Exploratory data analysis
-src/train.py             — sklearn Pipeline, models, GridSearchCV
-app/dashboard.py         — Dash dashboard
-models/best_model.pkl    — Saved best model (joblib)
+notebooks/01_eda.ipynb       — Exploratory data analysis
+src/train.py                 — sklearn Pipeline, models, GridSearchCV
+src/fairness_analysis.py     — SHAP feature importance + Fairlearn group metrics
+app/dashboard.py             — Dash dashboard (6 tabs)
+models/best_model.pkl        — Saved best model (joblib)
 ```
 
 ---
@@ -36,3 +37,31 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
+
+## How to Run
+
+Run the three steps in order:
+
+```bash
+# 1. Train the model — saves models/best_model.pkl and data/processed/residuals.csv
+python src/train.py
+
+# 2. Generate SHAP and Fairlearn outputs
+python src/fairness_analysis.py
+
+# 3. Launch the dashboard at http://127.0.0.1:8050
+python app/dashboard.py
+```
+
+## Dashboard
+
+Six tabs:
+
+| Tab | What it shows |
+|---|---|
+| Dataset Overview | Case counts, race breakdown, train/test split, methodology |
+| Why Not Linear Regression? | Dumbbell charts — actual vs predicted per individual, by race |
+| Finding 1: Aggregate | Mean sentence and crime severity by race across all drug offenses |
+| Finding 2: Simple Possession | Sentencing gap for Black defendants after controlling for legal factors |
+| SHAP: What Drives Sentences? | Top-10 features by mean absolute SHAP value — what the model actually learned |
+| Fairlearn: Model Fairness | MAE and R² broken down by racial group — model accuracy audit |

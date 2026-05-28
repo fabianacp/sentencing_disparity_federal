@@ -222,3 +222,8 @@ __marimo__/
 
 # Environment variables - never commit API keys
 .env
+
+
+# Data files - keep local only
+data/raw/*
+data/processed/*
