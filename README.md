@@ -38,6 +38,32 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## Dashboard Screenshots
+
+### Tab 1 — Dataset Overview
+![Dataset Overview](images/sentencing_tab_1_A.png)
+![Train / Test Split](images/sentencing_Tab_1_B.png)
+![Methodology](images/sentencing_Tab_1_C.png)
+![Model Performance & Initial Finding](images/sentencing_Tab_1_D.png)
+
+### Tab 2 — Why Not Linear Regression?
+![Dumbbell — White](images/sentencing_Tab_2_A.png)
+![Dumbbell — Black & Hispanic](images/sentencing_Tab_2_B.png)
+
+### Tab 3 — Finding 1: Aggregate
+![Finding 1](images/sentencing_Tab_3_A.png)
+
+### Tab 4 — Finding 2: Simple Possession
+![Finding 2](images/sentencing_Tab_4_A.png)
+
+### Tab 5 — SHAP: What Drives Sentences?
+![SHAP Feature Importance](images/sentencing_Tab_5_A.png)
+
+### Tab 6 — Fairlearn: Model Fairness
+![Fairlearn Group Metrics](images/sentencing_tab_6_A.png)
+
+---
+
 ## How to Run
 
 Run the three steps in order:
