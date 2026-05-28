@@ -1,14 +1,19 @@
-# Sentencing Disparity CA — Claude Code Instructions
+# Sentencing Disparity Federal — Claude Code Instructions
 
 ## What this project does
 A supervised machine learning model that identifies sentencing disparities 
-in California's prison system. We train on historical sentences, then flag 
+in U.S. federal courts. We train on historical sentences, then flag 
 cases where actual sentences diverge significantly from model predictions — 
 exposing potential bias by race, offense type, and legal representation.
 
 ## Dataset
-Redo.io California prison sentences — 95,000 real records obtained via 
-public records law. Source: github.com/redoio/three_strikes_project
+U.S. Sentencing Commission (USSC) — FY2020–FY2025 Non-Identifiable Data
+- ~66,000 real federal sentencing records per year across 6 fiscal years
+- Files: data/raw/opafy20nid.csv … opafy25nid.csv
+- Processed: data/processed/drug_sentences_fy20_fy25.csv (8,372 drug cases)
+- Source: https://www.ussc.gov/research/datafiles/commission-datafiles
+- Target variable: SENTTOT (total sentence in months)
+- Key features: SMIN1/SMAX1 (guideline range), CRIMPTS, ZONE, DISPOSIT, DISTRICT
 
 ## Coding rules — follow these every time
 - Use sklearn Pipeline for all preprocessing + model code
